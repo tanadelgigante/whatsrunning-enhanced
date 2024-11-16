@@ -83,9 +83,9 @@ def get_container_uptime(container):
         LOGGER.error("Error calculating uptime: %s", e)
         return "00:00:00"
 
-@app.route("/api/containers")
-def get_containers():
-    """API endpoint to get container data"""
+@app.route("/api/containers/list")
+def list_containers():
+    """API endpoint to get basic container information"""
     try:
         containers = CLIENT.containers.list()
         container_data = []
@@ -94,9 +94,6 @@ def get_containers():
             if CURRENT_CONTAINER_ID and container.id.startswith(CURRENT_CONTAINER_ID):
                 continue
                 
-            stats = get_container_stats(container)
-            uptime = get_container_uptime(container)
-            
             try:
                 health_status = container.attrs["State"].get("Health", {}).get("Status", "N/A")
                 container_status = container.attrs["State"]["Status"]
@@ -104,29 +101,50 @@ def get_containers():
                 health_status = "N/A"
                 container_status = "unknown"
             
-            ports = []
-            try:
-                if container.attrs["NetworkSettings"]["Ports"]:
-                    for name, value in container.attrs["NetworkSettings"]["Ports"].items():
-                        if name.endswith("/tcp") and value:
-                            ports.extend([v["HostPort"] for v in value if "HostPort" in v])
-            except Exception as e:
-                LOGGER.error("Error processing ports: %s", e)
-            
             container_data.append({
+                "id": container.id,
                 "name": container.name,
-                "ports": ports,
-                "cpu_percent": stats["cpu_percent"],
-                "memory_percent": stats["memory_percent"],
                 "status": container_status,
-                "health": health_status,
-                "uptime": uptime
+                "health": health_status
             })
             
         return jsonify(container_data)
     except Exception as e:
-        LOGGER.error("Error processing containers: %s", e)
+        LOGGER.error("Error listing containers: %s", e)
         return jsonify([])
+
+@app.route("/api/containers/<container_id>/stats")
+def get_container_details(container_id):
+    """API endpoint to get detailed stats for a single container"""
+    try:
+        container = CLIENT.containers.get(container_id)
+        
+        stats = get_container_stats(container)
+        uptime = get_container_uptime(container)
+        
+        ports = []
+        try:
+            if container.attrs["NetworkSettings"]["Ports"]:
+                for name, value in container.attrs["NetworkSettings"]["Ports"].items():
+                    if name.endswith("/tcp") and value:
+                        ports.extend([v["HostPort"] for v in value if "HostPort" in v])
+        except Exception as e:
+            LOGGER.error("Error processing ports: %s", e)
+        
+        return jsonify({
+            "cpu_percent": stats["cpu_percent"],
+            "memory_percent": stats["memory_percent"],
+            "ports": ports,
+            "uptime": uptime
+        })
+    except Exception as e:
+        LOGGER.error(f"Error getting container {container_id} stats: {e}")
+        return jsonify({
+            "cpu_percent": 0.0,
+            "memory_percent": 0.0,
+            "ports": [],
+            "uptime": "00:00:00"
+        })
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -234,58 +252,115 @@ HTML_TEMPLATE = """
         }
     </style>
     <script>
-        function updateContainers() {
-            fetch('/api/containers')
-                .then(response => response.json())
-                .then(data => {
-                    const container = document.getElementById('container-data');
-                    container.innerHTML = '';
-                    
-                    data.forEach(item => {
-                        const row = document.createElement('div');
-                        row.className = 'data-row';
-                        
-                        const healthClass = item.health.toLowerCase() !== 'n/a' 
-                            ? `health-${item.health.toLowerCase()}` 
-                            : '';
-                        
-                        row.innerHTML = `
-                            <div>${item.name}</div>
-                            <div>${item.cpu_percent}%</div>
-                            <div>${item.memory_percent}%</div>
-                            <div>${item.status}</div>
-                            <div class="${healthClass}">${item.health}</div>
-                            <div>${item.ports.join(', ')}</div>
-                            <div>${item.uptime}</div>
-                        `;
-                        
-                        container.appendChild(row);
-                    });
-                })
-                .catch(error => console.error('Error fetching data:', error));
-        }
-        
-        function updateTimer() {
-            const timerElement = document.getElementById('refresh-timer');
-            let seconds = 10;
+        class ContainerMonitor {
+            constructor() {
+                this.containers = new Map();
+                this.updateInterval = 10000; // 10 seconds
+                this.containerElement = document.getElementById('container-data');
+            }
             
-            function tick() {
-                timerElement.textContent = `Refreshing in ${seconds}s`;
-                seconds--;
-                
-                if (seconds < 0) {
-                    seconds = 10;
-                    updateContainers();
+            async initialize() {
+                await this.updateContainerList();
+                this.startPeriodicUpdates();
+            }
+            
+            async updateContainerList() {
+                try {
+                    const response = await fetch('/api/containers/list');
+                    const containers = await response.json();
+                    
+                    // Update container map
+                    const currentIds = new Set(containers.map(c => c.id));
+                    
+                    // Remove containers that no longer exist
+                    for (const [id] of this.containers) {
+                        if (!currentIds.has(id)) {
+                            this.containers.delete(id);
+                        }
+                    }
+                    
+                    // Add or update containers
+                    for (const container of containers) {
+                        if (!this.containers.has(container.id)) {
+                            this.containers.set(container.id, {
+                                ...container,
+                                cpu_percent: 0,
+                                memory_percent: 0,
+                                ports: [],
+                                uptime: '00:00:00'
+                            });
+                            this.updateContainerStats(container.id);
+                        } else {
+                            // Update basic info
+                            const existing = this.containers.get(container.id);
+                            existing.status = container.status;
+                            existing.health = container.health;
+                        }
+                    }
+                    
+                    this.renderContainers();
+                } catch (error) {
+                    console.error('Error updating container list:', error);
                 }
             }
             
-            tick();
-            setInterval(tick, 1000);
+            async updateContainerStats(containerId) {
+                try {
+                    const response = await fetch(`/api/containers/${containerId}/stats`);
+                    const stats = await response.json();
+                    
+                    const container = this.containers.get(containerId);
+                    if (container) {
+                        Object.assign(container, stats);
+                        this.renderContainers();
+                    }
+                } catch (error) {
+                    console.error(`Error updating stats for container ${containerId}:`, error);
+                }
+            }
+            
+            renderContainers() {
+                this.containerElement.innerHTML = '';
+                
+                for (const container of [...this.containers.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+                    const row = document.createElement('div');
+                    row.className = 'data-row';
+                    
+                    const healthClass = container.health.toLowerCase() !== 'n/a' 
+                        ? `health-${container.health.toLowerCase()}` 
+                        : '';
+                    
+                    row.innerHTML = `
+                        <div>${container.name}</div>
+                        <div>${container.cpu_percent}%</div>
+                        <div>${container.memory_percent}%</div>
+                        <div>${container.status}</div>
+                        <div class="${healthClass}">${container.health}</div>
+                        <div>${container.ports.join(', ')}</div>
+                        <div>${container.uptime}</div>
+                    `;
+                    
+                    this.containerElement.appendChild(row);
+                }
+            }
+            
+            startPeriodicUpdates() {
+                setInterval(() => this.updateContainerList(), this.updateInterval);
+                
+                // Update stats for each container every 10 seconds, staggered by 1 second each
+                setInterval(() => {
+                    let delay = 0;
+                    for (const [containerId] of this.containers) {
+                        setTimeout(() => this.updateContainerStats(containerId), delay);
+                        delay += 1000;
+                    }
+                }, this.updateInterval);
+            }
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-            updateContainers();
-            updateTimer();
+            const monitor = new ContainerMonitor();
+            monitor.initialize();
         });
     </script>
 </head>
