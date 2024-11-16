@@ -154,16 +154,26 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
-            font-family: sans-serif;
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #000;
-            color: #ffcc00;
+            background-color: #f5f5f5;
         }
         
-        h1, h5 {
-            text-align: center;
-            text-transform: uppercase;
+        h1 {
+            margin: 0;
+            padding: 0;
+            font-size: 24px;
+        }
+        
+        h5 {
+            margin: 5px 0 20px 0;
+            color: #666;
+        }
+        
+        .container {
+            position: relative;
+            padding-top: 40px;
         }
         
         .menu-header {
@@ -172,13 +182,13 @@ HTML_TEMPLATE = """
             gap: 10px;
             margin-bottom: 10px;
             font-weight: bold;
-            background-color: #222;
-            color: #ffcc00;
+            background-color: #fff;
             padding: 10px;
             border-radius: 5px;
             position: sticky;
             top: 0;
             z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .data-row {
@@ -186,21 +196,27 @@ HTML_TEMPLATE = """
             grid-template-columns: 150px repeat(6, 1fr);
             gap: 10px;
             padding: 10px;
-            background-color: #111;
-            border-radius: 5px;
+            background-color: #fff;
             margin-bottom: 5px;
+            border-radius: 5px;
             transition: background-color 0.3s ease;
         }
         
         .data-row:hover {
-            background-color: #333;
+            background-color: #f8f9fa;
         }
         
         .footer {
             margin-top: 20px;
-            text-align: left;
+            text-align: center;
             font-size: 12px;
-            color: #ffcc00;
+            color: #666;
+        }
+        
+        .footer a {
+            color: #666;
+            text-decoration: none;
+            margin: 0 10px;
         }
         
         .health-healthy {
@@ -219,10 +235,10 @@ HTML_TEMPLATE = """
             position: fixed;
             top: 20px;
             right: 20px;
-            background: #222;
+            background: #fff;
             padding: 5px 10px;
             border-radius: 5px;
-            color: #ffcc00;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         @media (max-width: 768px) {
@@ -350,27 +366,28 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <h1>What's Running</h1>
-    <h5>Container Overview</h5>
-
-    <div class="refresh-timer">Refreshing in 10s</div>
-
+    <h5>enhanced</h5>
+    
+    <div class="refresh-timer" id="refresh-timer">Refreshing in 10s</div>
+    
     <div class="container">
         <div class="menu-header">
             <div>Container Name</div>
-            <div>CPU %</div>
-            <div>Memory %</div>
+            <div>CPU (%)</div>
+            <div>Memory (%)</div>
             <div>Status</div>
             <div>Health</div>
             <div>Ports</div>
             <div>Uptime</div>
         </div>
-        <div id="container-data">
-            <!-- Dynamic container data rows will be inserted here -->
-        </div>
+        
+        <div id="container-data"></div>
     </div>
-
+    
     <div class="footer">
-        &copy; 2024 Your Company Name. All rights reserved.
+        © 2024 Mikeage / Il Gigante<br>
+        <a href="#">Github Mikeage</a>
+        <a href="#">Github Tanadelgigante</a>
     </div>
 </body>
 </html>
