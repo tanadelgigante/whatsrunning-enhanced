@@ -4,7 +4,7 @@ FROM python:3.12-alpine
 # Imposta la directory di lavoro all'interno del container
 WORKDIR /app
 
-# Imposta le variabili d'ambiente
+# Imposta le variabili d'ambiente 
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     PYTHONUNBUFFERED=1
