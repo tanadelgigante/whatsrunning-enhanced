@@ -3,6 +3,8 @@ import os
 import logging
 import asyncio
 import aiohttp
+import datetime
+from datetime import datetime
 
 import docker
 from flask import Flask, render_template_string, request
@@ -29,6 +31,34 @@ LOGGER.info(
 
 app = Flask(__name__)
 
+def get_container_stats(container):
+    """Get CPU, memory usage and other stats for a container"""
+    stats = container.stats(stream=False)  # Get a single stats reading
+    
+    # Calculate CPU percentage
+    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - \
+                stats["precpu_stats"]["cpu_usage"]["total_usage"]
+    system_delta = stats["cpu_stats"]["system_cpu_usage"] - \
+                  stats["precpu_stats"]["system_cpu_usage"]
+    cpu_percent = 0.0
+    if system_delta > 0:
+        cpu_percent = (cpu_delta / system_delta) * len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"]) * 100.0
+
+    # Calculate memory percentage
+    memory_usage = stats["memory_stats"]["usage"]
+    memory_limit = stats["memory_stats"]["limit"]
+    memory_percent = (memory_usage / memory_limit) * 100.0
+
+    return {
+        "cpu_percent": round(cpu_percent, 2),
+        "memory_percent": round(memory_percent, 2)
+    }
+
+def get_container_uptime(container):
+    """Calculate container uptime in HH:MM:SS format"""
+    started_at = datetime.strptime(container.attrs["State"]["StartedAt"].split('.')[0], "%Y-%m-%dT%H:%M:%S")
+    uptime = datetime.utcnow() - started_at
+    return str(datetime.utcfromtimestamp(uptime.total_seconds()).strftime('%H:%M:%S'))
 
 async def check_port_protocol(hostname, port):
     async with aiohttp.ClientSession() as session:
@@ -48,7 +78,6 @@ async def check_port_protocol(hostname, port):
 
     return None
 
-
 async def process_container(container, hostname, current_container_id):
     LOGGER.debug("Processing container %s", container.name)
 
@@ -58,9 +87,14 @@ async def process_container(container, hostname, current_container_id):
         LOGGER.debug("Skipping (current) container %s", container.name)
         return None  # Skip the current container
 
+    # Get container metrics
+    stats = get_container_stats(container)
+    uptime = get_container_uptime(container)
+    health_status = container.attrs["State"].get("Health", {}).get("Status", "N/A")
+    container_status = container.attrs["State"]["Status"]
+
     ports = []
     if container.attrs["NetworkSettings"]["Ports"]:
-        # Gather ports that are published via TCP
         for name, value in container.attrs["NetworkSettings"]["Ports"].items():
             if not name.endswith("/tcp"):
                 continue
@@ -81,13 +115,20 @@ async def process_container(container, hostname, current_container_id):
                 if protocol and protocol in ["http", "https"]:
                     ports.append((protocol, port))
 
-    if ports:
-        response = {"name": container.name, "ports": ports}
+    if ports or not ports:  # Always return container info even if no ports
+        response = {
+            "name": container.name,
+            "ports": ports,
+            "cpu_percent": stats["cpu_percent"],
+            "memory_percent": stats["memory_percent"],
+            "status": container_status,
+            "health": health_status,
+            "uptime": uptime
+        }
 
     LOGGER.debug("For container %s, found %s", container.name, response)
 
     return response
-
 
 async def process_containers(containers, hostname, current_container_id):
     tasks = [
@@ -95,17 +136,16 @@ async def process_containers(containers, hostname, current_container_id):
         for container in sorted(containers, key=lambda c: c.name)
     ]
 
-    # Run all tasks concurrently and filter out None results
     results = await asyncio.gather(*tasks)
     container_data = [result for result in results if result]
 
     return container_data
 
-
 @app.route("/about")
 def about():
     return f"Version: {VERSION}"
 
+# Modifica della route principale per includere il nuovo template
 
 @app.route("/")
 def list_ports():
@@ -116,20 +156,123 @@ def list_ports():
     containers = CLIENT.containers.list()
 
     html_template = """
+    <!DOCTYPE html>
     <html>
-    <head><title>Running Containers</title></head>
+    <head>
+        <title>What's Running</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            
+            h1 {
+                margin: 0;
+                padding: 0;
+                font-size: 24px;
+            }
+            
+            h5 {
+                margin: 5px 0 20px 0;
+                color: #666;
+            }
+            
+            .container {
+                position: relative;
+                padding-top: 40px; /* Space for header */
+            }
+            
+            .menu-header {
+                display: grid;
+                grid-template-columns: 150px repeat(6, 1fr);
+                gap: 10px;
+                margin-bottom: 10px;
+                font-weight: bold;
+                background-color: #fff;
+                padding: 10px;
+                border-radius: 5px;
+                position: sticky;
+                top: 0;
+            }
+            
+            .data-row {
+                display: grid;
+                grid-template-columns: 150px repeat(6, 1fr);
+                gap: 10px;
+                padding: 10px;
+                background-color: #fff;
+                margin-bottom: 5px;
+                border-radius: 5px;
+                position: relative;
+            }
+            
+            .footer {
+                margin-top: 20px;
+                text-align: center;
+                font-size: 12px;
+                color: #666;
+            }
+            
+            .footer a {
+                color: #666;
+                text-decoration: none;
+                margin: 0 10px;
+            }
+            
+            .health-healthy {
+                color: green;
+            }
+            
+            .health-unhealthy {
+                color: red;
+            }
+            
+            .health-starting {
+                color: orange;
+            }
+        </style>
+    </head>
     <body>
-        <h1>Published Ports for Running Containers</h1>
-        {% for container in containers %}
-            <h2>{{ container.name }}</h2>
-            <ul>
-            {% for (prefix, port) in container.ports %}
-                <li><a href="{{ prefix }}://{{ hostname }}:{{ port }}">{{ prefix }}://{{ hostname }}:{{ port }}</a></li>
+        <h1>What's Running</h1>
+        <h5>enhanced</h5>
+        
+        <div class="container">
+            <div class="menu-header">
+                <div>Nome container</div>
+                <div>CPU (%)</div>
+                <div>Memoria (%)</div>
+                <div>Stato</div>
+                <div>Health</div>
+                <div>Porte</div>
+                <div>Uptime</div>
+            </div>
+            
+            {% for container in containers %}
+            <div class="data-row" style="top: {{ loop.index0 * 30 }}px;">
+                <div>{{ container.name }}</div>
+                <div>{{ container.cpu_percent }}</div>
+                <div>{{ container.memory_percent }}</div>
+                <div>{{ container.status }}</div>
+                <div class="health-{{ container.health.lower() if container.health != 'N/A' else '' }}">
+                    {{ container.health }}
+                </div>
+                <div>
+                    {% for (prefix, port) in container.ports %}
+                        {{ port }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                <div>{{ container.uptime }}</div>
+            </div>
             {% endfor %}
-            </ul>
-        {% endfor %}
-        </ul>
-        <p>Version: {{ app_version }}</p>
+        </div>
+        
+        <div class="footer">
+            © 2024 Mikeage / Il Gigante<br>
+            <a href="#">Github Mikeage</a>
+            <a href="#">Github Tanadelgigante</a>
+        </div>
     </body>
     </html>
     """
@@ -144,7 +287,6 @@ def list_ports():
         hostname=HOSTNAME,
         app_version=VERSION,
     )
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("FLASK_PORT", "5000")))
