@@ -83,9 +83,9 @@ def get_container_uptime(container):
         LOGGER.error("Error calculating uptime: %s", e)
         return "00:00:00"
 
-@app.route("/api/containers/list")
-def list_containers():
-    """API endpoint to get basic container information"""
+@app.route("/api/containers")
+def get_containers():
+    """API endpoint to get container data"""
     try:
         containers = CLIENT.containers.list()
         container_data = []
@@ -94,6 +94,9 @@ def list_containers():
             if CURRENT_CONTAINER_ID and container.id.startswith(CURRENT_CONTAINER_ID):
                 continue
                 
+            stats = get_container_stats(container)
+            uptime = get_container_uptime(container)
+            
             try:
                 health_status = container.attrs["State"].get("Health", {}).get("Status", "N/A")
                 container_status = container.attrs["State"]["Status"]
@@ -101,50 +104,29 @@ def list_containers():
                 health_status = "N/A"
                 container_status = "unknown"
             
+            ports = []
+            try:
+                if container.attrs["NetworkSettings"]["Ports"]:
+                    for name, value in container.attrs["NetworkSettings"]["Ports"].items():
+                        if name.endswith("/tcp") and value:
+                            ports.extend([v["HostPort"] for v in value if "HostPort" in v])
+            except Exception as e:
+                LOGGER.error("Error processing ports: %s", e)
+            
             container_data.append({
-                "id": container.id,
                 "name": container.name,
+                "ports": ports,
+                "cpu_percent": stats["cpu_percent"],
+                "memory_percent": stats["memory_percent"],
                 "status": container_status,
-                "health": health_status
+                "health": health_status,
+                "uptime": uptime
             })
             
         return jsonify(container_data)
     except Exception as e:
-        LOGGER.error("Error listing containers: %s", e)
+        LOGGER.error("Error processing containers: %s", e)
         return jsonify([])
-
-@app.route("/api/containers/<container_id>/stats")
-def get_container_details(container_id):
-    """API endpoint to get detailed stats for a single container"""
-    try:
-        container = CLIENT.containers.get(container_id)
-        
-        stats = get_container_stats(container)
-        uptime = get_container_uptime(container)
-        
-        ports = []
-        try:
-            if container.attrs["NetworkSettings"]["Ports"]:
-                for name, value in container.attrs["NetworkSettings"]["Ports"].items():
-                    if name.endswith("/tcp") and value:
-                        ports.extend([v["HostPort"] for v in value if "HostPort" in v])
-        except Exception as e:
-            LOGGER.error("Error processing ports: %s", e)
-        
-        return jsonify({
-            "cpu_percent": stats["cpu_percent"],
-            "memory_percent": stats["memory_percent"],
-            "ports": ports,
-            "uptime": uptime
-        })
-    except Exception as e:
-        LOGGER.error(f"Error getting container {container_id} stats: {e}")
-        return jsonify({
-            "cpu_percent": 0.0,
-            "memory_percent": 0.0,
-            "ports": [],
-            "uptime": "00:00:00"
-        })
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -156,14 +138,8 @@ HTML_TEMPLATE = """
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
-            background-color: #f5f5f5;
-        }
-        
-        .main {
-            max-width: 1200px;
-            margin: 0 auto;
             padding: 20px;
+            background-color: #f5f5f5;
         }
         
         h1 {
@@ -175,61 +151,41 @@ HTML_TEMPLATE = """
         h5 {
             margin: 5px 0 20px 0;
             color: #666;
-            font-style: italic;
         }
         
-        .grid-container {
+        .container {
+            position: relative;
+            padding-top: 40px;
+        }
+        
+        .menu-header {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
-            gap: 1px;
-            background-color: #eee;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            overflow: hidden;
+            grid-template-columns: 150px repeat(6, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .header-cell {
+        .data-row {
+            display: grid;
+            grid-template-columns: 150px repeat(6, 1fr);
+            gap: 10px;
+            padding: 10px;
+            background-color: #fff;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .data-row:hover {
             background-color: #f8f9fa;
-            padding: 12px 15px;
-            font-weight: 500;
-            color: #333;
-            font-size: 0.9em;
-            text-align: left;
-        }
-        
-        .grid-cell {
-            background-color: white;
-            padding: 12px 15px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .container-name {
-            font-weight: 500;
-        }
-        
-        .numeric {
-            font-family: monospace;
-            text-align: right;
-        }
-        
-        .status-cell {
-            text-transform: capitalize;
-        }
-        
-        .health-healthy {
-            color: #22c55e;
-        }
-        
-        .health-unhealthy {
-            color: #ef4444;
-        }
-        
-        .health-starting {
-            color: #f59e0b;
-        }
-        
-        .loading {
-            opacity: 0.5;
         }
         
         .footer {
@@ -237,7 +193,6 @@ HTML_TEMPLATE = """
             text-align: center;
             font-size: 12px;
             color: #666;
-            padding: 20px;
         }
         
         .footer a {
@@ -246,185 +201,112 @@ HTML_TEMPLATE = """
             margin: 0 10px;
         }
         
+        .health-healthy {
+            color: #28a745;
+        }
+        
+        .health-unhealthy {
+            color: #dc3545;
+        }
+        
+        .health-starting {
+            color: #ffc107;
+        }
+        
+        .refresh-timer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #fff;
+            padding: 5px 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
         @media (max-width: 768px) {
-            .grid-container {
-                grid-template-columns: 1fr;
+            .menu-header, .data-row {
+                grid-template-columns: 1fr 1fr;
             }
             
-            .header-cell:not(:first-child),
-            .grid-cell:not(:first-child) {
-                display: none;
+            .menu-header > div, .data-row > div {
+                padding: 5px 0;
             }
         }
     </style>
     <script>
-        class ContainerMonitor {
-            constructor() {
-                this.containers = new Map();
-                this.updateInterval = 10000;
-                this.containerElement = null;
-                this.initialized = false;
-                this.preloadData();
-            }
-            
-            async preloadData() {
-                // Start loading data before DOM is ready
-                try {
-                    const containers = await this.fetchContainerList();
-                    this.containers = new Map(containers.map(c => [c.id, {
-                        ...c,
-                        cpu_percent: 0,
-                        memory_percent: 0,
-                        ports: [],
-                        uptime: '00:00:00'
-                    }]));
+        function updateContainers() {
+            fetch('/api/containers')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('container-data');
+                    container.innerHTML = '';
                     
-                    // Start fetching stats in parallel
-                    await this.updateAllContainerStats();
-                    
-                    if (this.initialized) {
-                        this.renderContainers();
-                    }
-                } catch (error) {
-                    console.error('Error preloading data:', error);
-                }
-            }
-            
-            async initialize() {
-                this.containerElement = document.getElementById('container-data');
-                this.initialized = true;
-                
-                if (this.containers.size > 0) {
-                    this.renderContainers();
-                }
-                
-                this.startPeriodicUpdates();
-            }
-            
-            async fetchContainerList() {
-                const response = await fetch('/api/containers/list');
-                return await response.json();
-            }
-            
-            async updateAllContainerStats() {
-                const promises = Array.from(this.containers.keys()).map(id => 
-                    this.fetchContainerStats(id)
-                );
-                
-                try {
-                    const results = await Promise.allSettled(promises);
-                    results.forEach((result, index) => {
-                        if (result.status === 'fulfilled') {
-                            const containerId = Array.from(this.containers.keys())[index];
-                            const container = this.containers.get(containerId);
-                            if (container) {
-                                Object.assign(container, result.value);
-                            }
-                        }
+                    data.forEach(item => {
+                        const row = document.createElement('div');
+                        row.className = 'data-row';
+                        
+                        const healthClass = item.health.toLowerCase() !== 'n/a' 
+                            ? `health-${item.health.toLowerCase()}` 
+                            : '';
+                        
+                        row.innerHTML = `
+                            <div>${item.name}</div>
+                            <div>${item.cpu_percent}%</div>
+                            <div>${item.memory_percent}%</div>
+                            <div>${item.status}</div>
+                            <div class="${healthClass}">${item.health}</div>
+                            <div>${item.ports.join(', ')}</div>
+                            <div>${item.uptime}</div>
+                        `;
+                        
+                        container.appendChild(row);
                     });
-                    
-                    if (this.initialized) {
-                        this.renderContainers();
-                    }
-                } catch (error) {
-                    console.error('Error updating container stats:', error);
-                }
-            }
-            
-            async fetchContainerStats(containerId) {
-                const response = await fetch(`/api/containers/${containerId}/stats`);
-                return await response.json();
-            }
-            
-            async updateContainerList() {
-                try {
-                    const containers = await this.fetchContainerList();
-                    const currentIds = new Set(containers.map(c => c.id));
-                    
-                    // Remove old containers
-                    for (const [id] of this.containers) {
-                        if (!currentIds.has(id)) {
-                            this.containers.delete(id);
-                        }
-                    }
-                    
-                    // Add new containers
-                    for (const container of containers) {
-                        if (!this.containers.has(container.id)) {
-                            this.containers.set(container.id, {
-                                ...container,
-                                cpu_percent: 0,
-                                memory_percent: 0,
-                                ports: [],
-                                uptime: '00:00:00'
-                            });
-                        } else {
-                            const existing = this.containers.get(container.id);
-                            existing.status = container.status;
-                            existing.health = container.health;
-                        }
-                    }
-                    
-                    await this.updateAllContainerStats();
-                    this.renderContainers();
-                } catch (error) {
-                    console.error('Error updating container list:', error);
-                }
-            }
-            
-            renderContainers() {
-                if (!this.containerElement) return;
-                
-                const containers = [...this.containers.values()]
-                    .sort((a, b) => a.name.localeCompare(b.name));
-                
-                this.containerElement.innerHTML = containers.map(container => {
-                    const healthClass = container.health.toLowerCase() !== 'n/a' 
-                        ? `health-${container.health.toLowerCase()}` 
-                        : '';
-                    
-                    return `
-                        <div class="grid-cell container-name">${container.name}</div>
-                        <div class="grid-cell numeric">${container.cpu_percent.toFixed(1)}%</div>
-                        <div class="grid-cell numeric">${container.memory_percent.toFixed(1)}%</div>
-                        <div class="grid-cell status-cell">${container.status}</div>
-                        <div class="grid-cell ${healthClass}">${container.health}</div>
-                        <div class="grid-cell">${container.ports.join(', ') || '-'}</div>
-                        <div class="grid-cell">${container.uptime}</div>
-                    `;
-                }).join('');
-            }
-            
-            startPeriodicUpdates() {
-                setInterval(() => this.updateContainerList(), this.updateInterval);
-            }
+                })
+                .catch(error => console.error('Error fetching data:', error));
         }
         
-        // Start preloading data immediately
-        const monitor = new ContainerMonitor();
+        function updateTimer() {
+            const timerElement = document.getElementById('refresh-timer');
+            let seconds = 10;
+            
+            function tick() {
+                timerElement.textContent = `Refreshing in ${seconds}s`;
+                seconds--;
+                
+                if (seconds < 0) {
+                    seconds = 10;
+                    updateContainers();
+                }
+            }
+            
+            tick();
+            setInterval(tick, 1000);
+        }
         
-        // Initialize UI when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
-            monitor.initialize();
+            updateContainers();
+            updateTimer();
         });
     </script>
 </head>
 <body>
-    <div class="main">
-        <h1>What's Running</h1>
-        <h5>enhanced</h5>
-        
-        <div class="grid-container">
-            <div class="header-cell">Nome container</div>
-            <div class="header-cell">CPU (%)</div>
-            <div class="header-cell">Memoria (%)</div>
-            <div class="header-cell">Stato</div>
-            <div class="header-cell">Health</div>
-            <div class="header-cell">Porte</div>
-            <div class="header-cell">Creato da</div>
-            
-            <div id="container-data"></div>
+    <h1>What's Running</h1>
+    <h5>enhanced</h5>
+    
+    <div class="refresh-timer" id="refresh-timer">Refreshing in 10s</div>
+    
+    <div class="container">
+        <div class="menu-header">
+            <div>Container Name</div>
+            <div>CPU (%)</div>
+            <div>Memory (%)</div>
+            <div>Status</div>
+            <div>Health</div>
+            <div>Ports</div>
+            <div>Uptime</div>
         </div>
+        
+        <div id="container-data"></div>
     </div>
     
     <div class="footer">
