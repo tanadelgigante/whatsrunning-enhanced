@@ -9,9 +9,6 @@ ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     PYTHONUNBUFFERED=1
 
-# Crea un utente non root
-RUN adduser -D appuser
-
 # Installa le dipendenze di sistema e Docker CLI
 RUN apk update && \
     apk add --no-cache \
@@ -28,12 +25,6 @@ RUN pip install --no-cache-dir flask docker aiohttp gunicorn
 
 # Copia il contenuto della directory corrente nel container in /app
 COPY . /app
-
-# Assegna la proprietà dei file all'utente non root e rende lo script eseguibile
-RUN chown -R appuser:appuser /app
-
-# Passa all'utente non root
-USER appuser
 
 EXPOSE 5000
 
