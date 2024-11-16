@@ -151,290 +151,121 @@ HTML_TEMPLATE = """
 <html>
 <head>
     <title>What's Running</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f5f5;
-        }
-        
         .main {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            background-color: black;
+            max-width: 800px;
+            min-height: 500px;
+            font-family: Arial, Helvetica, sans-serif;
+            margin-right: 25%;
+            margin-left: 25%;
+            color: #ffcc00;
         }
-        
         h1 {
-            margin: 0;
-            padding: 0;
-            font-size: 24px;
+            text-decoration: underline overline;
+            text-align: center;
+            text-transform: uppercase;
         }
-        
+        .menu-side, .menu-center-1, .menu-center-2, .menu-center-3, .menu-center-4, .menu-center-5, .menu-center-6 {
+            position: absolute;
+            font-weight: bold;
+        }
+        .menu-side {
+            margin-left: 5pt;
+            width: 150pt;
+            max-width: 30%;
+        }
+        .menu-center-1 {
+            margin-left: 120pt;
+        }
+        .menu-center-2 {
+            margin-left: 170pt;
+            padding-left: 15pt;
+        }
+        .menu-center-3 {
+            margin-left: 250pt;
+            padding-left: 15pt;
+            border-bottom-width: medium;
+        }
+        .menu-center-4 {
+            margin-left: 320pt;
+            padding-left: 15pt;
+            border-bottom-width: medium;
+        }
+        .menu-center-5 {
+            margin-left: 400pt;
+            padding-left: 15pt;
+            border-bottom-width: medium;
+        }
+        .menu-center-6 {
+            margin-left: 480pt;
+            padding-left: 15pt;
+            border-bottom-width: medium;
+        }
+        .menu {
+            border-bottom: thin solid #ffcc00;
+            margin-top: 5px;
+            position: relative;
+            top: -12px;
+        }
+        .footer {
+            border-top: thin solid #ffcc00;
+            position: relative;
+            margin-top: 12%;
+        }
+        a {
+            color: #cc9933;
+            text-decoration: underline;
+            font-family: Arial, Helvetica, sans-serif;
+        }
         h5 {
-            margin: 5px 0 20px 0;
-            color: #666;
-            font-style: italic;
+            text-align: center;
+            font-family: Arial, Helvetica, sans-serif;
+            text-transform: uppercase;
+            font-weight: lighter;
+            position: relative;
+            top: -20px;
         }
-        
-        .grid-container {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr;
-            gap: 1px;
-            background-color: #eee;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            overflow: hidden;
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
         }
-        
-        .header-cell {
-            background-color: #f8f9fa;
-            padding: 12px 15px;
-            font-weight: 500;
-            color: #333;
-            font-size: 0.9em;
+        .data-row div {
+            flex-basis: 100px;
             text-align: left;
         }
-        
-        .grid-cell {
-            background-color: white;
-            padding: 12px 15px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .container-name {
-            font-weight: 500;
-        }
-        
-        .numeric {
-            font-family: monospace;
-            text-align: right;
-        }
-        
-        .status-cell {
-            text-transform: capitalize;
-        }
-        
-        .health-healthy {
-            color: #22c55e;
-        }
-        
-        .health-unhealthy {
-            color: #ef4444;
-        }
-        
-        .health-starting {
-            color: #f59e0b;
-        }
-        
-        .loading {
-            opacity: 0.5;
-        }
-        
-        .footer {
-            margin-top: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-            padding: 20px;
-        }
-        
-        .footer a {
-            color: #666;
-            text-decoration: none;
-            margin: 0 10px;
-        }
-        
-        @media (max-width: 768px) {
-            .grid-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .header-cell:not(:first-child),
-            .grid-cell:not(:first-child) {
-                display: none;
-            }
-        }
     </style>
-    <script>
-        class ContainerMonitor {
-            constructor() {
-                this.containers = new Map();
-                this.updateInterval = 10000;
-                this.containerElement = null;
-                this.initialized = false;
-                this.preloadData();
-            }
-            
-            async preloadData() {
-                // Start loading data before DOM is ready
-                try {
-                    const containers = await this.fetchContainerList();
-                    this.containers = new Map(containers.map(c => [c.id, {
-                        ...c,
-                        cpu_percent: 0,
-                        memory_percent: 0,
-                        ports: [],
-                        uptime: '00:00:00'
-                    }]));
-                    
-                    // Start fetching stats in parallel
-                    await this.updateAllContainerStats();
-                    
-                    if (this.initialized) {
-                        this.renderContainers();
-                    }
-                } catch (error) {
-                    console.error('Error preloading data:', error);
-                }
-            }
-            
-            async initialize() {
-                this.containerElement = document.getElementById('container-data');
-                this.initialized = true;
-                
-                if (this.containers.size > 0) {
-                    this.renderContainers();
-                }
-                
-                this.startPeriodicUpdates();
-            }
-            
-            async fetchContainerList() {
-                const response = await fetch('/api/containers/list');
-                return await response.json();
-            }
-            
-            async updateAllContainerStats() {
-                const promises = Array.from(this.containers.keys()).map(id => 
-                    this.fetchContainerStats(id)
-                );
-                
-                try {
-                    const results = await Promise.allSettled(promises);
-                    results.forEach((result, index) => {
-                        if (result.status === 'fulfilled') {
-                            const containerId = Array.from(this.containers.keys())[index];
-                            const container = this.containers.get(containerId);
-                            if (container) {
-                                Object.assign(container, result.value);
-                            }
-                        }
-                    });
-                    
-                    if (this.initialized) {
-                        this.renderContainers();
-                    }
-                } catch (error) {
-                    console.error('Error updating container stats:', error);
-                }
-            }
-            
-            async fetchContainerStats(containerId) {
-                const response = await fetch(`/api/containers/${containerId}/stats`);
-                return await response.json();
-            }
-            
-            async updateContainerList() {
-                try {
-                    const containers = await this.fetchContainerList();
-                    const currentIds = new Set(containers.map(c => c.id));
-                    
-                    // Remove old containers
-                    for (const [id] of this.containers) {
-                        if (!currentIds.has(id)) {
-                            this.containers.delete(id);
-                        }
-                    }
-                    
-                    // Add new containers
-                    for (const container of containers) {
-                        if (!this.containers.has(container.id)) {
-                            this.containers.set(container.id, {
-                                ...container,
-                                cpu_percent: 0,
-                                memory_percent: 0,
-                                ports: [],
-                                uptime: '00:00:00'
-                            });
-                        } else {
-                            const existing = this.containers.get(container.id);
-                            existing.status = container.status;
-                            existing.health = container.health;
-                        }
-                    }
-                    
-                    await this.updateAllContainerStats();
-                    this.renderContainers();
-                } catch (error) {
-                    console.error('Error updating container list:', error);
-                }
-            }
-            
-            renderContainers() {
-                if (!this.containerElement) return;
-                
-                const containers = [...this.containers.values()]
-                    .sort((a, b) => a.name.localeCompare(b.name));
-                
-                this.containerElement.innerHTML = containers.map(container => {
-                    const healthClass = container.health.toLowerCase() !== 'n/a' 
-                        ? `health-${container.health.toLowerCase()}` 
-                        : '';
-                    
-                    return `
-                        <div class="grid-cell container-name">${container.name}</div>
-                        <div class="grid-cell numeric">${container.cpu_percent.toFixed(1)}%</div>
-                        <div class="grid-cell numeric">${container.memory_percent.toFixed(1)}%</div>
-                        <div class="grid-cell status-cell">${container.status}</div>
-                        <div class="grid-cell ${healthClass}">${container.health}</div>
-                        <div class="grid-cell">${container.ports.join(', ') || '-'}</div>
-                        <div class="grid-cell">${container.uptime}</div>
-                    `;
-                }).join('');
-            }
-            
-            startPeriodicUpdates() {
-                setInterval(() => this.updateContainerList(), this.updateInterval);
-            }
-        }
-        
-        // Start preloading data immediately
-        const monitor = new ContainerMonitor();
-        
-        // Initialize UI when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            monitor.initialize();
-        });
-    </script>
 </head>
 <body>
     <div class="main">
         <h1>What's Running</h1>
         <h5>enhanced</h5>
-        
-        <div class="grid-container">
-            <div class="header-cell">Nome container</div>
-            <div class="header-cell">CPU (%)</div>
-            <div class="header-cell">Memoria (%)</div>
-            <div class="header-cell">Stato</div>
-            <div class="header-cell">Health</div>
-            <div class="header-cell">Porte</div>
-            <div class="header-cell">Creato da</div>
-            
-            <div id="container-data"></div>
+        <div class="menu-side">Nome container</div>
+        <div class="menu-center-1">CPU (%)</div>
+        <div class="menu-center-2">Memoria (%)</div>
+        <div class="menu-center-3">Stato</div>
+        <div class="menu-center-4">Health</div>
+        <div class="menu-center-5">Porte</div>
+        <div class="menu-center-6">Creato da</div>
+        <div class="menu">&nbsp;</div>
+        <div id="container-data"></div>
+        <div class="footer">
+            © 2024 Mikeage / Il Gigante<br>
+            <a href="#">Github Mikeage</a><br>
+            <a href="#">Github Tanadelgigante</a>
         </div>
     </div>
-    
-    <div class="footer">
-        © 2024 Mikeage / Il Gigante<br>
-        <a href="#">Github Mikeage</a>
-        <a href="#">Github Tanadelgigante</a>
-    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // JavaScript per il caricamento dinamico dei container
+        });
+    </script>
 </body>
 </html>
 """
+
 
 @app.route("/")
 def list_ports():
