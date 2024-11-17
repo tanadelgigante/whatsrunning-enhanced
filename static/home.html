@@ -1,180 +1,236 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html><head>
-  
-  <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
-  <title>home</title>
+  <title>What's Running</title>
 
-  
-  
-  <style type="text/css">
-.main {
+    
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    
+  <style>
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: Arial,sans-serif;
   background-color: black;
-  max-width: 800px;
-  min-height: 500px;
-  font-family: Arial,Helvetica,sans-serif;
-  margin-right: 25%;
-  margin-left: 25%;
-  color: #ffcc00;
 }
 h1 {
-  text-decoration: underline overline;
+  margin: 0;
+  padding: 0;
+  font-size: xx-large;
   text-align: center;
-  text-transform: uppercase;
-}
-.side {
-  max-width: 30%;
-  position: absolute;
-  margin-left: 5pt;
-  width: 150pt;
-  padding-top: 5px;
-}
-.menu-side {
-  width: 150pt;
-  position: absolute;
-  margin-left: 5pt;
-  max-width: 30%;
-  font-weight: bold;
-}
-.menu-center-1 {
-  position: absolute;
-  margin-left: 120pt;
-  font-weight: bold;
-}
-.menu-center-2 {
-  font-weight: bold;
-  margin-left: 170pt;
-  position: absolute;
-  padding-left: 15pt;
-}
-.menu-center-3 {
-  padding-left: 15pt;
-  margin-left: 250pt;
-  font-weight: bold;
-  border-bottom-width: medium;
-  position: absolute;
-}
-.menu-center-4 {
-  border-bottom-width: medium;
-  margin-left: 320pt;
-  padding-left: 15pt;
-  position: absolute;
-  font-weight: bold;
-}
-.menu-center-5 {
-border-bottom-width: medium;
-margin-left: 400pt;
-padding-left: 15pt;
-position: absolute;
-font-weight: bold;
-}
-.menu-center-6 {
-border-bottom-width: medium;
-margin-left: 480pt;
-padding-left: 15pt;
-position: absolute;
-font-weight: bold;
-}
-.center-1 {
-  margin-left: 120pt;
-  position: absolute;
-  padding-top: 5px;
-}
-.center-2 {
-  margin-left: 170pt;
-  position: absolute;
-  padding-left: 15pt;
-  padding-top: 5px;
-}
-.center-3 {
-  margin-left: 250pt;
-  padding-left: 15pt;
-  border-bottom-width: medium;
-  position: absolute;
-  padding-top: 5px;
-}
-.center-4 {
-  padding-left: 15pt;
-  border-bottom-width: medium;
-  margin-left: 320pt;
-  position: absolute;
-  padding-top: 5px;
-}
-.center-5 {
-padding-left: 15pt;
-border-bottom-width: medium;
-margin-left: 400pt;
-position: absolute;
-padding-top: 5px;
-}
-.center-6 {
-padding-left: 15pt;
-border-bottom-width: medium;
-margin-left: 480pt;
-position: absolute;
-padding-top: 5px;
-}
-.menu {
-  border-bottom: thin solid #ffcc00;
-  margin-top: 5px;
-  top: -12px;
-  position: relative;
-}
-.footer {
-  border-top: thin solid #ffcc00;
-  position: relative;
-  margin-top: 12%;
-}
-a {
-  color: #cc9933;
   text-decoration: underline;
+  font-weight: bold;
   font-family: Arial,Helvetica,sans-serif;
+  text-transform: uppercase;
+  color: #ffcc00;
 }
 h5 {
+  margin: 5px 0 20px;
+  color: #907300;
+  font-weight: bold;
+  text-transform: uppercase;
   text-align: center;
   font-family: Arial,Helvetica,sans-serif;
-  text-transform: uppercase;
-  font-weight: lighter;
+}
+.container {
   position: relative;
-  top: -20px;
+  padding-top: 40px;
+  background-color: #333333;
+}
+.menu-header {
+  padding: 10px;
+  margin-bottom: 10px;
+  font-weight: bold;
+  background-color: #333333;
+  top: 0;
+  z-index: 1000;
+  font-family: Arial,Helvetica,sans-serif;
+  color: #ffcc00;
+}
+.data-row {
+  padding: 10px;
+  background-color: #333333;
+  margin-bottom: 5px;
+}
+.data-row:hover {
+  background-color: black;
+}
+.footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #ffcc00;
+}
+.footer a {
+  margin: 0 10px;
+  color: #ffcc00;
+  text-decoration: none;
+}
+.health-healthy {
+  color: #28a745;
+}
+.health-unhealthy {
+  color: #dc3545;
+}
+.health-starting {
+  color: #ffc107;
+}
+.refresh-timer {
+  padding: 5px 10px;
+  background: black none repeat scroll 0% 50%;
+  position: fixed;
+  top: 20px;
+  right: 20px;
 }
 
   </style>
+    
+  <script>
+        class ContainerMonitor {
+            constructor() {
+                this.containers = new Map();
+                this.updateInterval = 10000; // 10 seconds
+                this.containerElement = document.getElementById('container-data');
+            }
+            
+            async initialize() {
+                await this.updateContainerList();
+                this.startPeriodicUpdates();
+            }
+            
+            async updateContainerList() {
+                try {
+                    const response = await fetch('/api/containers/list');
+                    const containers = await response.json();
+                    
+                    // Update container map
+                    const currentIds = new Set(containers.map(c => c.id));
+                    
+                    // Remove containers that no longer exist
+                    for (const [id] of this.containers) {
+                        if (!currentIds.has(id)) {
+                            this.containers.delete(id);
+                        }
+                    }
+                    
+                    // Add or update containers
+                    for (const container of containers) {
+                        if (!this.containers.has(container.id)) {
+                            this.containers.set(container.id, {
+                                ...container,
+                                cpu_percent: 0,
+                                memory_percent: 0,
+                                ports: [],
+                                uptime: '00:00:00'
+                            });
+                            this.updateContainerStats(container.id);
+                        } else {
+                            // Update basic info
+                            const existing = this.containers.get(container.id);
+                            existing.status = container.status;
+                            existing.health = container.health;
+                        }
+                    }
+                    
+                    this.renderContainers();
+                } catch (error) {
+                    console.error('Error updating container list:', error);
+                }
+            }
+            
+            async updateContainerStats(containerId) {
+                try {
+                    const response = await fetch(`/api/containers/${containerId}/stats`);
+                    const stats = await response.json();
+                    
+                    const container = this.containers.get(containerId);
+                    if (container) {
+                        Object.assign(container, stats);
+                        this.renderContainers();
+                    }
+                } catch (error) {
+                    console.error(`Error updating stats for container ${containerId}:`, error);
+                }
+            }
+            
+            renderContainers() {
+                this.containerElement.innerHTML = '';
+                
+                for (const container of [...this.containers.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+                    const row = document.createElement('div');
+                    row.className = 'data-row';
+                    
+                    const healthClass = container.health.toLowerCase() !== 'n/a' 
+                        ? `health-${container.health.toLowerCase()}` 
+                        : '';
+                    
+                    row.innerHTML = `
+                        <div>${container.name}</div>
+                        <div>${container.cpu_percent}%</div>
+                        <div>${container.memory_percent}%</div>
+                        <div>${container.status}</div>
+                        <div class="${healthClass}">${container.health}</div>
+                        <div>${container.ports.join(', ')}</div>
+                        <div>${container.uptime}</div>
+                    `;
+                    
+                    this.containerElement.appendChild(row);
+                }
+            }
+            
+            startPeriodicUpdates() {
+                setInterval(() => this.updateContainerList(), this.updateInterval);
+                
+                // Update stats for each container every 10 seconds, staggered by 1 second each
+                setInterval(() => {
+                    let delay = 0;
+                    for (const [containerId] of this.containers) {
+                        setTimeout(() => this.updateContainerStats(containerId), delay);
+                        delay += 1000;
+                    }
+                }, this.updateInterval);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const monitor = new ContainerMonitor();
+            monitor.initialize();
+        });
+    </script>
 </head><body>
-<div class="main">
+    
 <h1>What's Running</h1>
+
+    
 <h5>enhanced</h5>
-<div class="menu-side">Nome container</div>
-<div class="menu-center-1">CPU (%)</div>
-<div class="menu-center-2">Memoria (%)</div>
-<div class="menu-center-3">Stato</div>
-<div class="menu-center-4">Health</div>
-<div class="menu-center-5">Porte</div>
-<div class="menu-center-6">Creato da</div>
-<div class="menu">&nbsp;</div>
-<div class="side"><span>Container
-1</span></div>
-<div class="center-1">20,5</div>
-<div class="center-2">0,5</div>
-<div class="center-3">running</div>
-<div class="center-4">healthy</div>
-<div class="center-5">8080:80</div>
-<div class="center-6">ieri</div>
-<div class="side"><span style="width: 150pt; top: 30px; position: relative;">Container 2</span></div>
-<div class="center-1"><span style="top: 30px; position: relative;">20,5</span></div>
-<div class="center-2"><span style="top: 30px; position: relative;">0,5</span></div>
-<div class="center-3"><span style="top: 30px; position: relative;">running</span></div>
-<div class="center-4"><span style="top: 30px; position: relative;">healthy</span></div>
-<div class="center-5"><span style="top: 30px; position: relative;">8080:80</span></div>
-<div class="center-6"><span style="top: 30px; position: relative;">ieri</span></div>
-<div class="side"><span style="width: 150pt; top: 60px; position: relative;">Container 3</span></div>
-<div class="center-1"><span style="top: 60px; position: relative;">20,5</span></div>
-<div class="center-2"><span style="top: 60px; position: relative;">0,5</span></div>
-<div class="center-3"><span style="top: 60px; position: relative;">running</span></div>
-<div class="center-4"><span style="top: 60px; position: relative;">healthy</span></div>
-<div class="center-5"><span style="top: 60px; position: relative;">8080:80</span></div>
-<div class="center-6"><span style="top: 60px; position: relative;">ieri</span></div>
-<div class="footer"><small><small>© 2024 Mikeage / Il Gigante<br>
-<a href="#">Github Mikeage</a><br>
-<a href="#">Github Tanadelgigante</a></small></small></div>
-</div>
+
+    
+    
+<div class="refresh-timer" id="refresh-timer">Refreshing in 10s</div>
+
+    
+    
+<div class="container">
+        <div class="menu-header">
+            <div>Container Name</div>
+            <div>CPU (%)</div>
+            <div>Memory (%)</div>
+            <div>Status</div>
+            <div>Health</div>
+            <div>Ports</div>
+            <div>Uptime</div>
+        </div>
+        
+        
+    </div>
+
+    
+    
+<div class="footer">
+        © 2024 Mikeage / Il Gigante<br>
+        <a href="#">Github Mikeage</a>
+        <a href="#">Github Tanadelgigante</a>
+    </div>
+
 </body></html>
