@@ -147,6 +147,7 @@ def get_container_details(container_id):
         })
 
 HTML_TEMPLATE = """
+<!DOCTYPE html>
 <html>
 <head>
     <title>What's Running</title>
@@ -227,17 +228,8 @@ HTML_TEMPLATE = """
           top: 20px;
           right: 20px;
         }
-        
-        @media (max-width: 768px) {
-            .menu-header, .data-row {
-                grid-template-columns: 1fr 1fr;
-            }
-            
-            .menu-header > div, .data-row > div {
-                padding: 5px 0;
-            }
-        }
-    </style>
+
+  </style>
     <script>
         class ContainerMonitor {
             constructor() {
@@ -354,7 +346,9 @@ HTML_TEMPLATE = """
 <body>
     <h1>What's Running</h1>
     <h5>enhanced</h5>
+    
     <div class="refresh-timer" id="refresh-timer">Refreshing in 10s</div>
+    
     <div class="container">
         <div class="menu-header">
             <div>Container Name</div>
@@ -365,9 +359,14 @@ HTML_TEMPLATE = """
             <div>Ports</div>
             <div>Uptime</div>
         </div>
+        
+        <div id="container-data"></div>
     </div>
-    <div class="footer"> © 2024 Mikeage / Il Gigante<br>
-        <a href="#">Github Mikeage</a> <a href="#">Github Tanadelgigante</a> 
+    
+    <div class="footer">
+        © 2024 Mikeage / Il Gigante<br>
+        <a href="#">Github Mikeage</a>
+        <a href="#">Github Tanadelgigante</a>
     </div>
 </body>
 </html>
