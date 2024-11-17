@@ -1,39 +1,36 @@
-# Usa una base image slim per ridurre le dimensioni
-FROM --platform=linux/arm/v6 python:3.12-alpine
-
-# Imposta la directory di lavoro all'interno del container
-WORKDIR /app
+# Usa una base image di Raspbian compatibile con ARMv6
+FROM balenalib/rpi-raspbian:bullseye
 
 # Imposta le variabili d'ambiente
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     PYTHONUNBUFFERED=1
 
-# Crea un utente non root
-RUN adduser -D appuser
-
-# Installa le dipendenze di sistema e Docker CLI
-RUN apk update && \
-    apk add --no-cache \
+# Installa le dipendenze di sistema
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+    apt-transport-https \
     ca-certificates \
     curl \
     gnupg \
-    # Scarica e installa Docker CLI
-    && curl -sSL https://download.docker.com/linux/static/stable/armhf/docker-20.10.9.tgz \
-    | tar xzvf - --strip 1 -C /usr/local/bin docker/docker \
-    && rm -rf /var/cache/apk/*
+    gnupg-agent \
+    software-properties-common \
+    lsb-release \
+    python3-pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Installa Docker CLI usando il metodo di installazione conveniente
+RUN curl -fsSL https://get.docker.com | sh
 
 # Installa le dipendenze Python
-RUN pip install --no-cache-dir flask docker aiohttp gunicorn
+RUN pip3 install --no-cache-dir flask docker aiohttp gunicorn
+
+# Crea la struttura della directory dell'app
+WORKDIR /app
 
 # Copia il contenuto della directory corrente nel container in /app
 COPY . /app
-
-# Assegna la proprietà dei file all'utente non root e rende lo script eseguibile
-RUN chown -R appuser:appuser /app
-
-# Passa all'utente non root
-USER appuser
 
 EXPOSE 5000
 
