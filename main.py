@@ -154,91 +154,79 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+          margin: 0;
+          padding: 20px;
+          font-family: Arial,sans-serif;
+          background-color: black;
         }
-        
         h1 {
-            margin: 0;
-            padding: 0;
-            font-size: 24px;
+          margin: 0;
+          padding: 0;
+          font-size: xx-large;
+          text-align: center;
+          text-decoration: underline;
+          font-weight: bold;
+          font-family: Arial,Helvetica,sans-serif;
+          text-transform: uppercase;
+          color: #ffcc00;
         }
-        
         h5 {
-            margin: 5px 0 20px 0;
-            color: #666;
+          margin: 5px 0 20px;
+          color: #907300;
+          font-weight: bold;
+          text-transform: uppercase;
+          text-align: center;
+          font-family: Arial,Helvetica,sans-serif;
         }
-        
         .container {
-            position: relative;
-            padding-top: 40px;
+          position: relative;
+          padding-top: 40px;
+          background-color: #333333;
         }
-        
         .menu-header {
-            display: grid;
-            grid-template-columns: 150px repeat(6, 1fr);
-            gap: 10px;
-            margin-bottom: 10px;
-            font-weight: bold;
-            background-color: #fff;
-            padding: 10px;
-            border-radius: 5px;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          padding: 10px;
+          margin-bottom: 10px;
+          font-weight: bold;
+          background-color: #333333;
+          top: 0;
+          z-index: 1000;
+          font-family: Arial,Helvetica,sans-serif;
+          color: #ffcc00;
         }
-        
         .data-row {
-            display: grid;
-            grid-template-columns: 150px repeat(6, 1fr);
-            gap: 10px;
-            padding: 10px;
-            background-color: #fff;
-            margin-bottom: 5px;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
+          padding: 10px;
+          background-color: #333333;
+          margin-bottom: 5px;
         }
-        
         .data-row:hover {
-            background-color: #f8f9fa;
+          background-color: black;
         }
-        
         .footer {
-            margin-top: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
+          margin-top: 20px;
+          text-align: center;
+          font-size: 12px;
+          color: #ffcc00;
         }
-        
         .footer a {
-            color: #666;
-            text-decoration: none;
-            margin: 0 10px;
+          margin: 0 10px;
+          color: #ffcc00;
+          text-decoration: none;
         }
-        
         .health-healthy {
-            color: #28a745;
+          color: #28a745;
         }
-        
         .health-unhealthy {
-            color: #dc3545;
+          color: #dc3545;
         }
-        
         .health-starting {
-            color: #ffc107;
+          color: #ffc107;
         }
-        
         .refresh-timer {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #fff;
-            padding: 5px 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          padding: 5px 10px;
+          background: black none repeat scroll 0% 50%;
+          position: fixed;
+          top: 20px;
+          right: 20px;
         }
         
         @media (max-width: 768px) {
