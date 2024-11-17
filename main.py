@@ -210,6 +210,7 @@ HTML_TEMPLATE = """
             border-radius: 5px;
             transition: background-color 0.3s ease;
             background-color: #333333;
+            color: #ffcc00;
         }
         
         .data-row:hover {
@@ -245,7 +246,7 @@ HTML_TEMPLATE = """
             position: fixed;
             top: 20px;
             right: 20px;
-            background: #fff;
+            background: black;
             padding: 5px 10px;
             border-radius: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
