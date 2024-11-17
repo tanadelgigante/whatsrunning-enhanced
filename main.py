@@ -173,12 +173,12 @@ HTML_TEMPLATE = """
         }
         
         h5 {
+            font-family: Arial,Helvetica,sans-serif;
+            color: #ffcc00;
             margin: 5px 0 20px 0;
             font-weight: bold;
             text-transform: uppercase;
             text-align: center;
-            font-family: Arial,Helvetica,sans-serif;
-            color: #ffcc00;
         }
         
         .container {
@@ -194,13 +194,13 @@ HTML_TEMPLATE = """
             margin-bottom: 10px;
             font-weight: bold;
             background-color: #333333;
+            color: #ffcc00;
             padding: 10px;
             border-radius: 5px;
             position: sticky;
             top: 0;
             z-index: 1000;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);            
-            color: #ffcc00;
         }
         
         .data-row {
