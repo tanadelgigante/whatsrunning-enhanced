@@ -1,19 +1,30 @@
-FROM arm32v6/python:3.9-alpine
+# Usa una base image di Raspbian compatibile con ARMv6
+FROM balenalib/rpi-raspbian:bullseye
 
-ENV PYTHONUNBUFFERED=1
+# Imposta le variabili d'ambiente
+ENV LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    PYTHONUNBUFFERED=1
 
-# Installa le dipendenze di sistema e Python in un unico layer
-RUN apk add --no-cache \
-    gcc \
-    musl-dev \
-    python3-dev \
-    libffi-dev \
-    openssl-dev \
-    docker-cli \
+# Installa le dipendenze di sistema
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+    apt-transport-https \
+    ca-certificates \
     curl \
-    ca-certificates && \
-    pip install --no-cache-dir flask docker aiohttp gunicorn && \
-    apk del gcc musl-dev python3-dev libffi-dev openssl-dev
+    gnupg \
+    gnupg-agent \
+    software-properties-common \
+    lsb-release \
+    python3-pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Installa Docker CLI usando il metodo di installazione conveniente
+RUN curl -fsSL https://get.docker.com | sh
+
+# Installa le dipendenze Python
+RUN pip3 install --no-cache-dir flask docker aiohttp gunicorn
 
 # Crea la struttura della directory dell'app
 WORKDIR /app
@@ -24,6 +35,8 @@ COPY . /app
 EXPOSE 5000
 
 ARG VERSION
+
 ENV VERSION=${VERSION}
 
+# Imposta l'entrypoint
 CMD ["gunicorn", "main:app", "-b", "0.0.0.0:5000", "--access-logfile=-", "--error-logfile=-"]
